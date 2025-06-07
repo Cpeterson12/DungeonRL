@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 6310471344284213954}
   - component: {fileID: 8193444110886573860}
   - component: {fileID: -4705169549947396956}
+  - component: {fileID: -5328842071799013418}
   m_Layer: 5
   m_Name: Drop Area
   m_TagString: Untagged
@@ -65,11 +66,11 @@ MonoBehaviour:
   showVisualFeedback: 1
   normalColor: {r: 1, g: 1, b: 1, a: 0.043137256}
   hoverColor: {r: 0.91004634, g: 1, b: 0, a: 0.16862746}
+  rejectedColor: {r: 1, g: 0, b: 0, a: 0.3}
   zoneSize: {x: 125, y: 125}
   onCardDropped: {fileID: 11400000, guid: 59eea3e8d48acb34986bc011fdcfc2e4, type: 2}
   onCardEnterZone: {fileID: 11400000, guid: 0c27105c196d3ef4893fcade30e104e7, type: 2}
   onCardExitZone: {fileID: 11400000, guid: 30b2bb9449563ac4e89465cfaa1fd945, type: 2}
-  startingCards: []
 --- !u!114 &8193444110886573860
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -116,3 +117,19 @@ MonoBehaviour:
   useX: 0
   useY: 1
   isUI: 1
+--- !u!114 &-5328842071799013418
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2607839715287218629}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 906a53de555607142ae0c3acb113e9ad, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  stackOffset: {x: 2, y: -2}
+  maxVisualStacks: 3
+  onCardStacked: {fileID: 0}
+  onCardRejected: {fileID: 0}

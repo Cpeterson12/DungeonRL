@@ -37,7 +37,7 @@ public class CardDragHandler : MonoBehaviour, IPointerDownHandler, IPointerUpHan
     private float originalAlpha;
     private bool isDragging;
     private DropZone currentDropZone;
-    private DropZone assignedDropZone; // The zone this card is currently "in"
+    private DropZone assignedDropZone;
     
     // Properties
     public bool IsDragging => isDragging;
@@ -45,7 +45,6 @@ public class CardDragHandler : MonoBehaviour, IPointerDownHandler, IPointerUpHan
 
     private void Awake()
     {
-        // Cache all components
         rectTransform = GetComponent<RectTransform>();
         Canvas parentCanvas = GetComponentInParent<Canvas>();
         graphicRaycaster = parentCanvas.GetComponent<GraphicRaycaster>();
@@ -64,14 +63,14 @@ public class CardDragHandler : MonoBehaviour, IPointerDownHandler, IPointerUpHan
     
     private void Update()
     {
-        // Make card follow its assigned drop zone when not dragging
-        if (!isDragging && assignedDropZone != null)
+        // Only follow zone position if not dragging and card is active (not hidden in stack)
+        if (!isDragging && assignedDropZone != null && gameObject.activeInHierarchy)
         {
             Vector2 targetPosition = assignedDropZone.GetSnapPosition();
             if (Vector2.Distance(rectTransform.anchoredPosition, targetPosition) > 1f)
             {
                 rectTransform.anchoredPosition = targetPosition;
-                originalPosition = targetPosition; // Update original position too
+                originalPosition = targetPosition;
             }
         }
     }
@@ -80,12 +79,10 @@ public class CardDragHandler : MonoBehaviour, IPointerDownHandler, IPointerUpHan
     {
         DropZone targetZone = startingDropZone ?? (autoDetectStartingZone ? FindOverlappingDropZone() : null);
         
-        if (targetZone != null)
+        if (targetZone != null && targetZone.TryDropCard(gameObject))
         {
-            Vector2 snapPosition = targetZone.GetSnapPosition();
-            rectTransform.anchoredPosition = snapPosition;
-            originalPosition = snapPosition;
-            assignedDropZone = targetZone; // Assign the card to this zone
+            assignedDropZone = targetZone;
+            UpdateOriginalPosition();
         }
     }
 
@@ -109,10 +106,17 @@ public class CardDragHandler : MonoBehaviour, IPointerDownHandler, IPointerUpHan
     {
         if (!isDraggable) return;
         
-        // Store state and start dragging
+        // Store current state
         originalPosition = rectTransform.anchoredPosition;
         originalSiblingIndex = transform.GetSiblingIndex();
         isDragging = true;
+        
+        // Remove from current zone's stack (this handles unstacking properly)
+        if (assignedDropZone?.StackManager != null)
+        {
+            assignedDropZone.StackManager.RemoveCardFromStack(this);
+        }
+        assignedDropZone = null;
         
         // Apply visual feedback
         SetVisualState(dragScale, dragAlpha, true);
@@ -126,14 +130,14 @@ public class CardDragHandler : MonoBehaviour, IPointerDownHandler, IPointerUpHan
     {
         if (!isDraggable || !isDragging) return;
         
-        // Update position
+        // Update card position
         if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
             graphicRaycaster.transform as RectTransform, eventData.position, uiCamera, out Vector2 localPosition))
         {
             rectTransform.anchoredPosition = localPosition + dragOffset;
         }
         
-        // Check for drop zones
+        // Detect drop zones
         UpdateDropZoneDetection(eventData);
     }
 
@@ -143,13 +147,13 @@ public class CardDragHandler : MonoBehaviour, IPointerDownHandler, IPointerUpHan
         
         isDragging = false;
         
-        // Try to drop or snap back
+        // Try to drop in a zone, otherwise return to original position
         if (!TryDropInCurrentZone())
         {
             SnapToPosition(originalPosition);
         }
         
-        // Clean up and restore state
+        // Clean up and restore visual state
         CleanupDropZone();
         SetVisualState(originalScale.x, originalAlpha, false);
         onCardEndDrag?.RaiseAction(gameObject);
@@ -176,7 +180,7 @@ public class CardDragHandler : MonoBehaviour, IPointerDownHandler, IPointerUpHan
         foreach (RaycastResult result in results)
         {
             DropZone dropZone = result.gameObject.GetComponentInParent<DropZone>();
-            if (dropZone != null && dropZone.CanAcceptCard(gameObject))
+            if (dropZone != null)
             {
                 newDropZone = dropZone;
                 break;
@@ -196,7 +200,8 @@ public class CardDragHandler : MonoBehaviour, IPointerDownHandler, IPointerUpHan
     {
         if (currentDropZone != null && currentDropZone.TryDropCard(gameObject))
         {
-            assignedDropZone = currentDropZone; // Assign card to this new zone
+            assignedDropZone = currentDropZone;
+            UpdateOriginalPosition();
             SnapToPosition(currentDropZone.GetSnapPosition());
             return true;
         }
@@ -225,7 +230,6 @@ public class CardDragHandler : MonoBehaviour, IPointerDownHandler, IPointerUpHan
 
     private void SnapToPosition(Vector2 targetPosition)
     {
-        originalPosition = targetPosition;
         StartCoroutine(AnimateToPosition(targetPosition));
     }
     
@@ -244,6 +248,12 @@ public class CardDragHandler : MonoBehaviour, IPointerDownHandler, IPointerUpHan
         }
         
         rectTransform.anchoredPosition = targetPosition;
+        UpdateOriginalPosition();
+    }
+
+    private void UpdateOriginalPosition()
+    {
+        originalPosition = rectTransform.anchoredPosition;
     }
     
     // Public utility methods
@@ -253,30 +263,25 @@ public class CardDragHandler : MonoBehaviour, IPointerDownHandler, IPointerUpHan
         canvasGroup.blocksRaycasts = draggable;
     }
     
-    public void SetOriginalPosition(Vector2 position)
-    {
-        originalPosition = position;
-        rectTransform.anchoredPosition = position;
-    }
-    
     public void AssignToDropZone(DropZone dropZone)
     {
         if (dropZone != null)
         {
             startingDropZone = dropZone;
-            assignedDropZone = dropZone; // Set as assigned zone
-            Vector2 snapPosition = dropZone.GetSnapPosition();
-            rectTransform.anchoredPosition = snapPosition;
-            originalPosition = snapPosition;
+            assignedDropZone = dropZone;
+            UpdateOriginalPosition();
         }
     }
     
     public DropZone GetAssignedDropZone() => assignedDropZone;
     
-    // Method to unassign card from any drop zone
     public void UnassignFromDropZone()
     {
+        if (assignedDropZone?.StackManager != null)
+        {
+            assignedDropZone.StackManager.RemoveCardFromStack(this);
+        }
         assignedDropZone = null;
-        originalPosition = rectTransform.anchoredPosition;
+        UpdateOriginalPosition();
     }
 }

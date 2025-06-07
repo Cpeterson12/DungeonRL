@@ -12,6 +12,7 @@ public class DropZone : MonoBehaviour
     [SerializeField] private bool showVisualFeedback = true;
     [SerializeField] private Color normalColor = new Color(1f, 1f, 1f, 0.1f);
     [SerializeField] private Color hoverColor = new Color(0f, 1f, 0f, 0.3f);
+    [SerializeField] private Color rejectedColor = new Color(1f, 0f, 0f, 0.3f);
     [SerializeField] private Vector2 zoneSize = new Vector2(200f, 300f);
     
     [Header("Events")]
@@ -19,30 +20,29 @@ public class DropZone : MonoBehaviour
     [SerializeField] private GameAction onCardEnterZone;
     [SerializeField] private GameAction onCardExitZone;
     
-    [Header("Starting Cards")]
-    [SerializeField] private GameObject[] startingCards;
-    
-    // Components and state
+    // Components
     private RectTransform rectTransform;
     private Image backgroundImage;
+    private CardStackManager stackManager;
     private bool isCardHovering;
     
     // Properties
     public string ZoneName => zoneName;
     public bool AcceptAnyCard => acceptAnyCard;
-    public Vector2 SnapPosition => rectTransform.anchoredPosition + snapOffset;
     public bool IsCardHovering => isCardHovering;
+    public CardStackManager StackManager => stackManager;
+    public Vector2 SnapOffset => snapOffset;
+    public bool HasCards => stackManager.HasCards;
+    public int CardCount => stackManager.StackSize;
+    public string CurrentCardType => stackManager.CardType;
 
     private void Awake()
     {
         rectTransform = GetComponent<RectTransform>() ?? gameObject.AddComponent<RectTransform>();
         rectTransform.sizeDelta = zoneSize;
+        
+        stackManager = GetComponent<CardStackManager>() ?? gameObject.AddComponent<CardStackManager>();
         SetupVisualFeedback();
-    }
-
-    private void Start()
-    {
-        AssignStartingCards();
     }
 
     private void SetupVisualFeedback()
@@ -51,7 +51,6 @@ public class DropZone : MonoBehaviour
         backgroundImage.color = showVisualFeedback ? normalColor : Color.clear;
         backgroundImage.raycastTarget = true;
         
-        // Create simple white sprite if needed
         if (backgroundImage.sprite == null)
         {
             Texture2D texture = new Texture2D(1, 1);
@@ -61,36 +60,23 @@ public class DropZone : MonoBehaviour
         }
     }
 
-    private void AssignStartingCards()
-    {
-        foreach (GameObject cardObj in startingCards)
-        {
-            if (cardObj?.GetComponent<CardDragHandler>() is CardDragHandler cardHandler)
-            {
-                AssignCardToZone(cardHandler);
-            }
-        }
-    }
-
-    private void AssignCardToZone(CardDragHandler cardHandler)
-    {
-        Vector2 snapPosition = GetSnapPosition();
-        cardHandler.GetComponent<RectTransform>().anchoredPosition = snapPosition;
-        cardHandler.SetOriginalPosition(snapPosition);
-        cardHandler.AssignToDropZone(this); // Make sure card follows this zone
-    }
-
-    public bool CanAcceptCard(GameObject card) => acceptAnyCard;
+    public bool CanAcceptCard(GameObject card) => acceptAnyCard && stackManager.CanAcceptCard(card);
 
     public Vector2 GetSnapPosition() => rectTransform.anchoredPosition + snapOffset;
 
     public void OnCardEnter(GameObject card)
     {
-        if (!CanAcceptCard(card)) return;
-        
         isCardHovering = true;
-        UpdateVisualState(hoverColor);
-        onCardEnterZone?.RaiseAction(card);
+        
+        if (CanAcceptCard(card))
+        {
+            UpdateVisualState(hoverColor);
+            onCardEnterZone?.RaiseAction(card);
+        }
+        else
+        {
+            UpdateVisualState(rejectedColor);
+        }
     }
 
     public void OnCardExit(GameObject card)
@@ -102,12 +88,20 @@ public class DropZone : MonoBehaviour
 
     public bool TryDropCard(GameObject card)
     {
-        if (!CanAcceptCard(card)) return false;
+        CardDragHandler cardHandler = card.GetComponent<CardDragHandler>();
+        if (cardHandler == null) return false;
         
-        onCardDropped?.RaiseAction(card);
-        OnCardExit(card); // Reset visual state
-        return true;
+        if (stackManager.TryAddCard(cardHandler))
+        {
+            onCardDropped?.RaiseAction(card);
+            OnCardExit(card); // Reset visual state
+            return true;
+        }
+        
+        return false;
     }
+
+    public void RemoveCard(CardDragHandler cardHandler) => stackManager.RemoveCardFromStack(cardHandler);
 
     private void UpdateVisualState(Color color)
     {
@@ -115,51 +109,6 @@ public class DropZone : MonoBehaviour
             backgroundImage.color = color;
     }
 
-    public void SetZoneSize(Vector2 newSize)
-    {
-        zoneSize = newSize;
-        if (rectTransform != null)
-            rectTransform.sizeDelta = zoneSize;
-    }
-
-    public void SetVisualFeedback(bool enabled)
-    {
-        showVisualFeedback = enabled;
-        UpdateVisualState(enabled ? normalColor : Color.clear);
-    }
-
-    public void AssignCard(GameObject cardObject)
-    {
-        if (cardObject?.GetComponent<CardDragHandler>() is CardDragHandler cardHandler)
-        {
-            AssignCardToZone(cardHandler);
-        }
-    }
-
-    // Debug visualization
-    private void OnDrawGizmos()
-    {
-        if (rectTransform == null) return;
-        
-        Gizmos.color = isCardHovering ? Color.green : Color.white;
-        Vector3 center = transform.position;
-        Vector3 size = new Vector3(zoneSize.x, zoneSize.y, 1f);
-        Gizmos.DrawWireCube(center, size);
-    }
-
-    private void OnDrawGizmosSelected()
-    {
-        if (rectTransform == null) return;
-        
-        // Draw zone area
-        Gizmos.color = new Color(0f, 1f, 0f, 0.2f);
-        Vector3 center = transform.position;
-        Vector3 size = new Vector3(zoneSize.x, zoneSize.y, 1f);
-        Gizmos.DrawCube(center, size);
-        
-        // Draw snap position
-        Gizmos.color = Color.red;
-        Vector3 snapPos = center + new Vector3(snapOffset.x, snapOffset.y, 0f);
-        Gizmos.DrawWireSphere(snapPos, 10f);
-    }
+    [ContextMenu("Clear Zone")]
+    public void ClearZone() => stackManager.ClearStack();
 }
