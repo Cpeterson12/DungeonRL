@@ -4,77 +4,127 @@ using TMPro;
 
 public class CardDisplay : MonoBehaviour
 {
-    [Header("UI References")]
-    public TextMeshProUGUI cardNameText;
-    public TextMeshProUGUI descriptionText;
-    public TextMeshProUGUI goldValueText;
-    public Image cardArtImage;
-    public Image cardBackgroundImage;
-    public Image cardBorderImage;
+    [Header("Card Data")]
+    [SerializeField] private LootCardData cardData;
     
-    [Header("Monster-Specific UI (optional)")]
-    public TextMeshProUGUI healthText;
-    public TextMeshProUGUI damageText;
+    [Header("UI Elements")]
+    [SerializeField] private Image cardBackground;
+    [SerializeField] private Image cardArt;
+    [SerializeField] private Image cardBorder;
+
+    [Header("TextMeshPro ")]
+    [SerializeField] private TextMeshProUGUI nameTextTMP;
+    [SerializeField] private TextMeshProUGUI descriptionTextTMP;
     
-    [Header("Current Card Data")]
-    public BaseCard currentCard;
-    
-    // Method to set up the card display with ScriptableObject data
-    public void SetupCard(BaseCard cardData)
+    [Header("Settings")]
+    [SerializeField] private bool updateInRealTime = true;
+
+    private void Start()
     {
-        currentCard = cardData;
         UpdateCardDisplay();
     }
-    
-    // Method to refresh the display (useful if data changes)
-    public void UpdateCardDisplay()
+
+    private void Update()
     {
-        if (currentCard == null) return;
-        
-        // Update basic card info
-        if (cardNameText != null && currentCard.cardName != null)
-            cardNameText.text = currentCard.cardName.data;
-            
-        if (descriptionText != null && currentCard.description != null)
-            descriptionText.text = currentCard.description.data;
-            
-        if (goldValueText != null && currentCard.goldValue != null)
-            goldValueText.text = currentCard.goldValue.data.ToString();
-            
-        // Update card art
-        if (cardArtImage != null && currentCard.cardArt != null && currentCard.cardArt.CurrentSprite != null)
-            cardArtImage.sprite = currentCard.cardArt.CurrentSprite;
-            
-        // Update card background
-        if (cardBackgroundImage != null && currentCard.cardBackgroundSprite != null && currentCard.cardBackgroundSprite.CurrentSprite != null)
-            cardBackgroundImage.sprite = currentCard.cardBackgroundSprite.CurrentSprite;
-            
-        // Update card border
-        if (cardBorderImage != null && currentCard.cardBorderSprite != null && currentCard.cardBorderSprite.CurrentSprite != null)
-            cardBorderImage.sprite = currentCard.cardBorderSprite.CurrentSprite;
-        
-        // If this is a monster card, update monster-specific info
-        if (currentCard is MonsterCard monster)
-        {
-            UpdateMonsterDisplay(monster);
-        }
-    }
-    
-    private void UpdateMonsterDisplay(MonsterCard monster)
-    {
-        if (healthText != null && monster.health != null)
-            healthText.text = monster.health.data.ToString("F0"); // F0 removes decimal places for display
-            
-        if (damageText != null && monster.damage != null)
-            damageText.text = monster.damage.data.ToString("F0");
-    }
-    
-    // Optional: Update display when the ScriptableObject is assigned in the inspector
-    private void OnValidate()
-    {
-        if (currentCard != null)
+        // Update in real-time for testing/development
+        if (updateInRealTime)
         {
             UpdateCardDisplay();
         }
+    }
+
+    public void SetCardData(LootCardData newCardData)
+    {
+        cardData = newCardData;
+        UpdateCardDisplay();
+    }
+
+    private void UpdateCardDisplay()
+    {
+        if (cardData == null) return;
+
+        // Update visual elements
+        UpdateSprite(cardBackground, cardData.cardBackground);
+        UpdateSprite(cardArt, cardData.cardArt);
+        UpdateSprite(cardBorder, cardData.cardBorder);
+
+        // Update text elements
+        UpdateNameText();
+        UpdateDescriptionText();
+    }
+
+    private void UpdateSprite(Image imageComponent, Sprite spriteData)
+    {
+        if (imageComponent != null && spriteData != null)
+        {
+            imageComponent.sprite = spriteData;
+        }
+    }
+
+    private void UpdateNameText()
+    {
+        string displayName = GetDisplayName();
+        
+        // Update TextMeshPro component
+        if (nameTextTMP != null)
+        {
+            nameTextTMP.text = displayName;
+        }
+    }
+
+    private void UpdateDescriptionText()
+    {
+        string displayDescription = GetDisplayDescription();
+        
+        // Update TextMeshPro component
+        if (descriptionTextTMP != null)
+        {
+            descriptionTextTMP.text = displayDescription;
+        }
+    }
+
+    private string GetDisplayName()
+    {
+        if (cardData.stackLevel > 1)
+        {
+            return $"{cardData.cardName} +{cardData.stackLevel - 1}";
+        }
+        return cardData.cardName;
+    }
+
+    private string GetDisplayDescription()
+    {
+        string description = cardData.description;
+        
+        // Add bonus summary if the card has any bonuses
+        if (cardData.HasAnyBonuses())
+        {
+            string bonuses = cardData.GetBonusSummary();
+            if (!string.IsNullOrEmpty(bonuses))
+            {
+                description += "\n\n" + bonuses;
+            }
+        }
+        
+        return description;
+    }
+
+    // Public method to refresh display (useful for external scripts)
+    public void RefreshDisplay()
+    {
+        UpdateCardDisplay();
+    }
+
+    // Method to get the current card data (useful for other scripts)
+    public LootCardData GetCardData()
+    {
+        return cardData;
+    }
+
+    // Context menu for testing in editor
+    [ContextMenu("Update Card Display")]
+    private void ForceUpdateDisplay()
+    {
+        UpdateCardDisplay();
     }
 }

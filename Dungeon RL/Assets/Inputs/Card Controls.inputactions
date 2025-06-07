@@ -1,0 +1,74 @@
+{
+    "name": "Card Controls",
+    "maps": [
+        {
+            "name": "ClickandDrag",
+            "id": "3c384050-9622-4d52-9137-c44834351a83",
+            "actions": [
+                {
+                    "name": "OnCardStartDrag",
+                    "type": "Button",
+                    "id": "d4dc92f5-d36b-4bd9-bfa9-84c0d1fe397f",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "OnCardEndDrag",
+                    "type": "Button",
+                    "id": "50632659-0e23-48fd-81c7-9f5b81900682",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "OnCardSelect",
+                    "type": "Button",
+                    "id": "5df83925-81a1-4330-9009-fd70b9c7e377",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                }
+            ],
+            "bindings": [
+                {
+                    "name": "",
+                    "id": "e700fd09-922a-4452-90f0-5a97b63b6255",
+                    "path": "<Mouse>/leftButton",
+                    "interactions": "Hold",
+                    "processors": "",
+                    "groups": "",
+                    "action": "OnCardStartDrag",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "1cc4d338-86f8-470e-b97d-e6fa8e38b6e4",
+                    "path": "<Mouse>/leftButton",
+                    "interactions": "Hold",
+                    "processors": "",
+                    "groups": "",
+                    "action": "OnCardEndDrag",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "43373419-3f36-4bd7-a8c6-2e5a819dcb35",
+                    "path": "<Mouse>/leftButton",
+                    "interactions": "Press",
+                    "processors": "",
+                    "groups": "",
+                    "action": "OnCardSelect",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                }
+            ]
+        }
+    ],
+    "controlSchemes": []
+}
