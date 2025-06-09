@@ -4,8 +4,9 @@ using System.Collections.Generic;
 public class CardStackManager : MonoBehaviour
 {
     [Header("Stacking Settings")]
-    [SerializeField] private Vector2 stackOffset = new Vector2(2f, -2f);
-    [SerializeField] private int maxVisualStacks = 3;
+    [SerializeField] private Vector2 stackOffset = new Vector2(8f, -8f);
+    [SerializeField] private Vector2 maxStackBounds = new Vector2(150f, 200f); // Max area cards can spread within
+    [SerializeField] private float minOffsetMultiplier = 0.3f; // How much to compress when many cards
     
     [Header("Events")]
     [SerializeField] private GameAction onCardStacked;
@@ -81,14 +82,12 @@ public class CardStackManager : MonoBehaviour
             return;
         }
         
-        // Find the card's position in the stack
-        int cardIndex = stackedCards.IndexOf(cardHandler);
+        // Remove the card from the stack
+        stackedCards.Remove(cardHandler);
         
-        // Remove the card
-        stackedCards.RemoveAt(cardIndex);
-        
-        // Make sure the removed card is visible (in case it was hidden)
+        // Make sure the removed card is visible and reset its layer
         cardHandler.gameObject.SetActive(true);
+        cardHandler.transform.SetAsLastSibling(); // Bring to front while dragging
         
         // If we removed the last card and there are still cards, unlock the type
         if (!HasCards)
@@ -96,7 +95,7 @@ public class CardStackManager : MonoBehaviour
             lockedCardType = "";
         }
         
-        // Update the remaining stack
+        // Update the remaining stack visuals
         UpdateStackVisuals();
         
         Debug.Log($"Card removed from stack. Remaining size: {StackSize}");
@@ -128,44 +127,73 @@ public class CardStackManager : MonoBehaviour
     {
         if (StackSize == 0) return;
         
-        // Hide all cards except the top one
-        for (int i = 0; i < stackedCards.Count - 1; i++)
+        // Calculate dynamic offset that gets smaller with more cards
+        Vector2 dynamicOffset = CalculateDynamicOffset();
+        
+        // Position and layer all cards in the stack
+        for (int i = 0; i < stackedCards.Count; i++)
         {
             if (stackedCards[i] != null)
             {
-                stackedCards[i].gameObject.SetActive(false);
+                CardDragHandler card = stackedCards[i];
+                
+                // Make sure all cards are visible
+                card.gameObject.SetActive(true);
+                
+                // Set layering - higher index = on top
+                card.transform.SetSiblingIndex(card.transform.parent.childCount - stackedCards.Count + i);
+                
+                // Position card with progressive offset
+                Vector2 cardPosition = GetBaseStackPosition() + (dynamicOffset * i);
+                RectTransform cardRect = card.GetComponent<RectTransform>();
+                if (cardRect != null)
+                {
+                    cardRect.anchoredPosition = cardPosition;
+                }
+                
+                // Update stack level display for each card
+                UpdateCardDisplay(card, i + 1);
             }
         }
-        
-        // Make sure the top card is visible and positioned correctly
-        if (stackedCards.Count > 0 && stackedCards[stackedCards.Count - 1] != null)
-        {
-            CardDragHandler topCard = stackedCards[stackedCards.Count - 1];
-            topCard.gameObject.SetActive(true);
-            UpdateTopCardDisplay(topCard);
-            PositionTopCard(topCard);
-        }
     }
 
-    private void UpdateTopCardDisplay(CardDragHandler topCard)
+    // Calculate offset that gets smaller as stack grows to stay within bounds
+    private Vector2 CalculateDynamicOffset()
     {
-        CardDisplay cardDisplay = topCard.GetComponent<CardDisplay>();
+        if (StackSize <= 1) return Vector2.zero;
+        
+        // Calculate how much we need to compress the offset
+        float compressionFactor = Mathf.Lerp(1f, minOffsetMultiplier, (StackSize - 1) / 8f); // Compress over 8 cards
+        
+        // Make sure we don't exceed the drop zone bounds
+        Vector2 maxAllowedOffset = maxStackBounds / Mathf.Max(StackSize - 1, 1);
+        Vector2 compressedOffset = stackOffset * compressionFactor;
+        
+        // Use the smaller of the two to ensure we stay in bounds
+        return new Vector2(
+            Mathf.Min(Mathf.Abs(compressedOffset.x), Mathf.Abs(maxAllowedOffset.x)) * Mathf.Sign(stackOffset.x),
+            Mathf.Min(Mathf.Abs(compressedOffset.y), Mathf.Abs(maxAllowedOffset.y)) * Mathf.Sign(stackOffset.y)
+        );
+    }
+
+    // Get the base position for the stack (where the first card sits)
+    private Vector2 GetBaseStackPosition()
+    {
+        if (parentDropZone == null) return Vector2.zero;
+        
+        RectTransform dropZoneRect = parentDropZone.GetComponent<RectTransform>();
+        return dropZoneRect.anchoredPosition + parentDropZone.SnapOffset;
+    }
+
+    // Update individual card display with its position in the stack
+    private void UpdateCardDisplay(CardDragHandler card, int positionInStack)
+    {
+        CardDisplay cardDisplay = card.GetComponent<CardDisplay>();
         if (cardDisplay?.GetCardData() != null)
         {
+            // Each card shows its own position in the stack and the total stack size
             cardDisplay.GetCardData().stackLevel = StackSize;
             cardDisplay.RefreshDisplay();
-        }
-    }
-
-    private void PositionTopCard(CardDragHandler topCard)
-    {
-        if (parentDropZone == null) return;
-        
-        Vector2 stackPosition = GetStackSnapPosition();
-        RectTransform cardRect = topCard.GetComponent<RectTransform>();
-        if (cardRect != null)
-        {
-            cardRect.anchoredPosition = stackPosition;
         }
     }
 
@@ -173,10 +201,12 @@ public class CardStackManager : MonoBehaviour
     {
         if (parentDropZone == null) return Vector2.zero;
         
-        RectTransform dropZoneRect = parentDropZone.GetComponent<RectTransform>();
-        Vector2 basePosition = dropZoneRect.anchoredPosition + parentDropZone.SnapOffset;
+        // Return where the TOP card of the stack will be positioned
+        Vector2 basePosition = GetBaseStackPosition();
+        Vector2 dynamicOffset = CalculateDynamicOffset();
         
-        return basePosition + (stackOffset * Mathf.Min(StackSize, maxVisualStacks));
+        // The top card position is base + offset * (stack size - 1)
+        return basePosition + (dynamicOffset * Mathf.Max(StackSize - 1, 0));
     }
 
     public List<LootCardData> GetAllCardData()

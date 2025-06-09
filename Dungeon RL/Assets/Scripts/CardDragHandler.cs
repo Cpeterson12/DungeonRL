@@ -63,9 +63,17 @@ public class CardDragHandler : MonoBehaviour, IPointerDownHandler, IPointerUpHan
     
     private void Update()
     {
-        // Only follow zone position if not dragging and card is active (not hidden in stack)
+        // Only follow zone position if not dragging, card is active, and not managed by stack positioning
         if (!isDragging && assignedDropZone != null && gameObject.activeInHierarchy)
         {
+            // Check if this card is part of a stack - if so, let CardStackManager handle positioning
+            if (assignedDropZone.StackManager != null && assignedDropZone.StackManager.StackSize > 1)
+            {
+                // Stack manager handles positioning for stacked cards
+                return;
+            }
+            
+            // For single cards, follow the drop zone position
             Vector2 targetPosition = assignedDropZone.GetSnapPosition();
             if (Vector2.Distance(rectTransform.anchoredPosition, targetPosition) > 1f)
             {
